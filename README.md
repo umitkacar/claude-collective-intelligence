@@ -1,0 +1,1 @@
+# plugin-ai-agent-rabbitmq
