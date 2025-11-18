@@ -28,14 +28,34 @@
     "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
     "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage --coverageReporters=text-lcov",
     "test:ci": "NODE_OPTIONS=--experimental-vm-modules jest --ci --coverage --maxWorkers=2",
-    "test:debug": "node --experimental-vm-modules --inspect-brk node_modules/.bin/jest --runInBand"
+    "test:debug": "node --experimental-vm-modules --inspect-brk node_modules/.bin/jest --runInBand",
+    "migrate": "node-pg-migrate",
+    "migrate:up": "node-pg-migrate up",
+    "migrate:down": "node-pg-migrate down",
+    "migrate:create": "node-pg-migrate create",
+    "db:seed": "node src/db/seed.js",
+    "db:reset": "node src/db/reset.js"
   },
   "dependencies": {
     "amqplib": "^0.10.3",
-    "chalk": "^5.3.0",
+    "bcryptjs": "^3.0.3",
+    "chalk": "^5.6.2",
+    "crypto-js": "^4.2.0",
     "dotenv": "^16.3.1",
+    "express-rate-limit": "^8.2.1",
+    "ioredis": "^5.3.2",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "lru-cache": "^10.1.0",
+    "node-pg-migrate": "^6.2.2",
     "ora": "^7.0.1",
-    "uuid": "^9.0.1"
+    "pg": "^8.11.3",
+    "pg-pool": "^3.6.1",
+    "redis": "^4.6.11",
+    "uuid": "^9.0.1",
+    "winston": "^3.18.3",
+    "winston-daily-rotate-file": "^5.0.0",
+    "xss": "^1.0.14"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
