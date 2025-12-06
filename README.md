@@ -4,7 +4,7 @@
 
 Transform multiple independent Claude Code sessions into a **collaborative AI team** with real-time communication, task distribution, brainstorming, and result aggregation!
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-%3E%3D3.12.0-orange)](https://www.rabbitmq.com/)
 
@@ -60,16 +60,22 @@ This plugin transforms isolated Claude sessions into an **orchestrated AI team**
 # Install dependencies
 npm install
 
-# Start RabbitMQ (Docker)
-docker run -d --name rabbitmq \
-  -p 5672:5672 \
-  -p 15672:15672 \
-  rabbitmq:3-management
+# Start all services (RabbitMQ, PostgreSQL, Redis, etc.)
+sudo docker compose up -d
 
 # Verify RabbitMQ is running
 curl http://localhost:15672
-# Login: guest / guest
+# Login: admin / rabbitmq123
 ```
+
+### 1b. Quick Demo (Recommended!)
+
+```bash
+# Launch multi-terminal Claude Code demo
+./scripts/launch-claude-demo.sh
+```
+
+This opens 3 terminals with Claude Code instances that communicate via RabbitMQ!
 
 ### 2. Basic 3-Terminal Setup
 
@@ -413,11 +419,34 @@ AGENT_NAME="Frontend Expert" node scripts/orchestrator.js collaborator
 
 ## 📖 Documentation
 
-- [5-Terminal Scenario](examples/5-terminal-scenario.md) - Complete walkthrough
-- [Agent Documentation](agents/) - Detailed agent capabilities
-- [Command Reference](commands/) - All slash commands
-- [Skills Reference](skills/) - All available skills
-- [Architecture Guide](docs/architecture.md) - System design
+- **[MASTER-GUIDE.md](docs/MASTER-GUIDE.md)** - Complete system documentation
+- [Quick Start](docs/guides/QUICK-START.md) - 5-minute setup guide
+- [Troubleshooting](docs/guides/TROUBLESHOOTING.md) - Problem solving
+- [MCP Server Guide](docs/architecture/MCP-SERVER-GUIDE.md) - MCP tools reference
+- [Architecture](docs/architecture/ARCHITECTURE.md) - System design
+
+## 🔌 MCP Tools (Claude Code Integration)
+
+When using Claude Code in this project, these MCP tools are available:
+
+| Tool | Description |
+|------|-------------|
+| `register_agent` | Register as team-leader/worker/collaborator/monitor |
+| `send_task` | Send task to worker queue |
+| `get_pending_tasks` | Get tasks waiting to be processed |
+| `complete_task` | Mark task as done with result |
+| `start_brainstorm` | Start collaborative brainstorm |
+| `propose_idea` | Add idea to brainstorm |
+| `create_vote` | Create voting session |
+| `cast_vote` | Vote on decision |
+| `get_messages` | Get received messages/results |
+| `get_system_status` | System overview |
+
+**Example Usage:**
+```
+# In Claude Code, tell it:
+"MCP tool ile team-leader olarak register ol, sonra worker'a görev gönder"
+```
 
 ## 🚀 Advanced Features
 
@@ -509,7 +538,7 @@ This is an ultra-powerful orchestration system! Contributions welcome:
 
 ## 📝 License
 
-MIT License - see [LICENSE](LICENSE) file
+Apache-2.0 License - see [LICENSE](LICENSE) file
 
 ## 🌟 Features Summary
 

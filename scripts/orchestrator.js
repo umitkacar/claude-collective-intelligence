@@ -45,12 +45,13 @@ class AgentOrchestrator {
     // Setup event listeners
     this.client.on('connected', () => {
       console.log('✅ Agent connected to orchestration system');
-      this.publishStatus({ event: 'connected', agentType: this.agentType }, 'agent.status.connected');
+      // Note: publishStatus deferred until exchanges are ready
     });
 
     this.client.on('disconnected', () => {
       console.log('⚠️  Agent disconnected from orchestration system');
-      this.publishStatus({ event: 'disconnected', agentType: this.agentType }, 'agent.status.disconnected');
+      // Note: publishStatus may fail if exchange not ready
+      this.publishStatus({ event: 'disconnected', agentType: this.agentType }, 'agent.status.disconnected').catch(() => {});
     });
 
     this.client.on('error', (error) => {
@@ -81,6 +82,9 @@ class AgentOrchestrator {
 
     // Status exchange
     await this.client.setupStatusExchange();
+
+    // Now publish connected status (exchanges are ready)
+    await this.publishStatus({ event: 'connected', agentType: this.agentType }, 'agent.status.connected');
 
     console.log('✅ All queues and exchanges ready\n');
   }

@@ -59,12 +59,14 @@ The MCP Server is configured in `.mcp.json`:
       "command": "node",
       "args": ["scripts/mcp-server.js"],
       "env": {
-        "RABBITMQ_URL": "amqp://localhost:5672"
+        "RABBITMQ_URL": "amqp://admin:rabbitmq123@localhost:5672"
       }
     }
   }
 }
 ```
+
+> **Note:** The URL includes credentials (admin:rabbitmq123) which match the Docker Compose configuration.
 
 ## Available Tools
 
@@ -247,7 +249,7 @@ Use: cast_vote with voteId="..." choice="REST" confidence=90
 
 2. **Check RabbitMQ status:**
    - Open http://localhost:15672
-   - Login: guest / guest
+   - Login: admin / rabbitmq123
 
 3. **Connection refused:**
    - Verify RABBITMQ_URL in .mcp.json
