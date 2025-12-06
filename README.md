@@ -4,7 +4,7 @@
 
 Transform multiple independent Claude Code sessions into a **collaborative AI team** with real-time communication, task distribution, brainstorming, and result aggregation!
 
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-%3E%3D3.12.0-orange)](https://www.rabbitmq.com/)
 
@@ -538,7 +538,7 @@ This is an ultra-powerful orchestration system! Contributions welcome:
 
 ## 📝 License
 
-Apache-2.0 License - see [LICENSE](LICENSE) file
+Proprietary License - Copyright (c) 2025 Dr. Umit Kacar - see [LICENSE](LICENSE) file
 
 ## 🌟 Features Summary
 
