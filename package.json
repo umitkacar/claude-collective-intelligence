@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node scripts/orchestrator.js",
+    "menu": "node scripts/cli-menu.js",
     "monitor": "node scripts/monitor.js",
     "setup": "node scripts/setup-rabbitmq.js",
     "test": "npm run test:unit && npm run test:integration && npm run test:e2e",
