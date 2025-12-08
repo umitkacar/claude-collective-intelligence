@@ -259,3 +259,298 @@ Proposed Solution: Separate brainstorm result queue
 ```
 
 See: `docs/lessons/LESSONS_LEARNED.md` for full analysis and implementation blueprint.
+
+---
+
+## 🎓 Knowledge from claude-quality-intelligence Plugin
+
+**This agent has been enhanced with production-validated patterns from the 100K GEM achievement.**
+
+### Lesson #3: Exclusive Queues for RPC (CRITICAL FOR WORKERS!)
+
+**The 100K GEM Pattern for Brainstorm Responses:**
+
+Workers participating in brainstorms need EXCLUSIVE queues for receiving brainstorm responses, NOT shared queues!
+
+**The Problem (Before 100K GEM Fix):**
+
+```javascript
+// ❌ WRONG - Shared brainstorm.results queue
+await channel.assertQueue('brainstorm.results', {
+  durable: true,
+  exclusive: false  // ❌ Multiple workers compete!
+});
+
+// Multiple workers consume from SAME queue
+worker1.consume('brainstorm.results', handleResponse);  // Gets response A
+worker2.consume('brainstorm.results', handleResponse);  // Gets response B
+worker3.consume('brainstorm.results', handleResponse);  // Gets response C
+
+// Problem: Response intended for worker1 might go to worker2!
+// Result: Random timeouts, lost responses, confusion!
+```
+
+**The Solution (100K GEM Pattern):**
+
+```javascript
+// ✅ CORRECT - Per-worker exclusive queue
+const brainstormQueue = `brainstorm.results.${this.agentId}`;
+
+await channel.assertQueue(brainstormQueue, {
+  exclusive: true,   // ✅ ONLY this worker!
+  autoDelete: true,  // ✅ Cleanup on disconnect
+  durable: false     // ✅ Temporary (no persistence needed)
+});
+
+// ONLY this worker consumes from its own queue
+this.channel.consume(brainstormQueue, handleResponse);
+```
+
+**Benefits:**
+- ✅ Guaranteed response delivery (no round-robin stealing!)
+- ✅ No timeouts (response always reaches sender)
+- ✅ Auto-cleanup (queue deleted when worker disconnects)
+- ✅ Scalable (unlimited workers, each with own queue)
+
+**Worker Implementation:**
+
+```javascript
+class WorkerAgent {
+  constructor(config = {}) {
+    // CRITICAL: Accept agentId from Team Leader (Lesson #4!)
+    this.agentId = config.agentId || process.env.AGENT_ID || `worker-${uuidv4()}`;
+    //             ^^^^^^^^^^^^^^  ← Config FIRST!
+
+    this.brainstormQueue = `brainstorm.results.${this.agentId}`;
+  }
+
+  async initialize() {
+    // Create exclusive brainstorm result queue
+    await this.channel.assertQueue(this.brainstormQueue, {
+      exclusive: true,    // ✅ Exclusive to this worker
+      autoDelete: true,   // ✅ Cleanup on disconnect
+      durable: false      // ✅ Temporary
+    });
+
+    console.log(`✅ Worker exclusive queue: ${this.brainstormQueue}`);
+
+    // Consume brainstorm responses
+    await this.channel.consume(this.brainstormQueue, async (msg) => {
+      const response = JSON.parse(msg.content.toString());
+
+      console.log(`📥 Brainstorm response received: ${response.sessionId}`);
+
+      await this.handleBrainstormResponse(response);
+      this.channel.ack(msg);
+    });
+  }
+
+  async sendBrainstormResponse(sessionId, suggestion) {
+    // Publish response to Leader's exclusive queue
+    const leaderQueue = `brainstorm.results.${this.leaderId}`;
+
+    await this.channel.sendToQueue(
+      leaderQueue,
+      Buffer.from(JSON.stringify({
+        type: 'brainstorm_response',
+        sessionId,
+        workerId: this.agentId,
+        suggestion,
+        timestamp: new Date().toISOString()
+      })),
+      {
+        correlationId: sessionId,
+        replyTo: this.brainstormQueue  // ← Worker's exclusive queue!
+      }
+    );
+  }
+}
+```
+
+**Related:**
+- **Skill:** [amqp-rpc-pattern-generator](https://github.com/umitkacar/claude-plugins-marketplace/tree/master/claude-quality-intelligence/skills/amqp-rpc-pattern-generator) - Generates RPC client/server with exclusive queues
+- **Agent:** [Queue Architecture Specialist](https://github.com/umitkacar/claude-plugins-marketplace/blob/master/claude-quality-intelligence/agents/queue-architecture-specialist.md) - Topology design expert
+- **Lesson:** [Lesson #3: Exclusive Queues for RPC](https://github.com/umitkacar/claude-plugins-marketplace/blob/master/claude-quality-intelligence/docs/lessons/LESSONS_LEARNED.md#lesson-3-exclusive-queues-for-rpc)
+- **ADR:** [ADR-001: Exclusive Result Queues](https://github.com/umitkacar/claude-plugins-marketplace/blob/master/claude-quality-intelligence/docs/architecture/ADR-001-exclusive-result-queues.md)
+
+---
+
+### Lesson #1: Single Responsibility Queues
+
+**Workers Must NEVER Consume from agent.results!**
+
+This is a **CRITICAL architectural constraint** from the 100K GEM achievement:
+
+**The Anti-Pattern (What NOT to Do):**
+
+```javascript
+// ❌ WRONG - Worker consuming from agent.results
+await channel.assertQueue('agent.results', { durable: true });
+
+// Worker tries to consume
+worker.consume('agent.results', handleResult);
+
+// Problem: Competes with Team Leader for task results!
+// Team Leader ALSO consumes from agent.results
+// Result: Race condition, lost messages, inconsistent state
+```
+
+**Why This Fails:**
+
+```
+Single Queue, Dual Purpose:
++-------------------------------------+
+|     agent.results (SHARED)          |
++-----------------+-------------------+
+| Purpose 1:      | Purpose 2:        |
+| Task Results    | Brainstorm        |
+| Leader <-- All  | Responses         |
+|                 | Worker <-- All    |
++-----------------+-------------------+
+
+CONFLICT: Both consumers compete for same messages!
+14/20 tests pass (70%) → 19/25 tests pass (76%) after fix
+```
+
+**The Solution:**
+
+```javascript
+// ✅ CORRECT - Workers use EXCLUSIVE queues only
+
+// Worker consumes from:
+// 1. agent.tasks (shared, competing consumers OK)
+await channel.assertQueue('agent.tasks', {
+  durable: true,
+  exclusive: false  // ✅ Shared work queue
+});
+
+// 2. brainstorm.results.{workerId} (exclusive, per-worker)
+await channel.assertQueue(`brainstorm.results.${this.agentId}`, {
+  exclusive: true,   // ✅ Exclusive
+  autoDelete: true,
+  durable: false
+});
+
+// Worker NEVER consumes from agent.results!
+// That queue belongs to Team Leader ONLY!
+```
+
+**Single Responsibility Principle:**
+
+```
+Queue Responsibilities:
+
+agent.tasks
+  ✅ Purpose: Work distribution
+  ✅ Pattern: Competing consumers
+  ✅ Consumers: ALL workers (round-robin)
+
+agent.results
+  ✅ Purpose: Task results to Leader
+  ✅ Pattern: Single consumer
+  ✅ Consumers: Team Leader ONLY
+
+brainstorm.results.{agentId}
+  ✅ Purpose: Brainstorm responses per agent
+  ✅ Pattern: Exclusive per agent
+  ✅ Consumers: ONE agent per queue
+```
+
+**Related:**
+- **Skill:** [message-queue-analyzer](https://github.com/umitkacar/claude-plugins-marketplace/tree/master/claude-quality-intelligence/skills/message-queue-analyzer) - Detects dual-purpose queue anti-patterns
+- **Lesson:** [Lesson #1: Single Queue Dual Purpose = Disaster](https://github.com/umitkacar/claude-plugins-marketplace/blob/master/claude-quality-intelligence/docs/lessons/LESSONS_LEARNED.md#lesson-1-single-queue-dual-purpose--disaster)
+- **ADR:** [ADR-002: Dual-Publish Pattern](https://github.com/umitkacar/claude-plugins-marketplace/blob/master/claude-quality-intelligence/docs/architecture/ADR-002-dual-publish-pattern.md)
+
+---
+
+### Lesson #5: Dual-Publish Pattern for Monitoring
+
+**Workers should publish status updates using dual-publish:**
+
+```javascript
+// Worker publishes task completion
+async publishTaskComplete(task, result) {
+  // 1. TARGETED DELIVERY (to Team Leader)
+  await this.channel.sendToQueue(
+    'agent.results',
+    Buffer.from(JSON.stringify({
+      taskId: task.id,
+      workerId: this.agentId,
+      result: result
+    }))
+  );
+
+  // 2. BROADCAST (to Monitor)
+  await this.channel.publish(
+    'status.broadcast',
+    'task.completed',
+    Buffer.from(JSON.stringify({
+      type: 'task_completed',
+      taskId: task.id,
+      workerId: this.agentId,
+      result: result,
+      _metadata: {
+        timestamp: new Date().toISOString(),
+        duration: Date.now() - task.startTime,
+        agentId: this.agentId
+      }
+    }))
+  );
+}
+```
+
+**Benefits:**
+- ✅ Team Leader receives result (workflow continues)
+- ✅ Monitor receives broadcast (complete visibility)
+- ✅ No blocking, no race conditions
+
+**Related:**
+- **Skill:** [observability-pattern-designer](https://github.com/umitkacar/claude-plugins-marketplace/tree/master/claude-quality-intelligence/skills/observability-pattern-designer) - Generates dual-publish code
+- **Agent:** [Monitor Agent](monitor-agent.md) - Enhanced with dual-publish pattern
+- **Lesson:** [Lesson #5: Dual-Publish Pattern](https://github.com/umitkacar/claude-plugins-marketplace/blob/master/claude-quality-intelligence/docs/lessons/LESSONS_LEARNED.md#lesson-5-dual-publish-pattern)
+
+---
+
+### Skills Available
+
+Worker Agent can leverage these claude-quality-intelligence skills:
+
+1. **amqp-rpc-pattern-generator**
+   - Generate RPC client code with exclusive queues
+   - Implement brainstorm response pattern
+   - CLI: `python scripts/generate_rpc.py --service brainstorm --language javascript --role client`
+
+2. **observability-pattern-designer**
+   - Generate dual-publish status update code
+   - Coordinate with Monitor Agent
+   - CLI: `python scripts/generate_observability.py --service worker-status --language javascript`
+
+3. **parameter-priority-enforcer**
+   - Validate constructor accepts agentId from config (Lesson #4!)
+   - CLI: `python scripts/parameter_validator.py src/agents/worker-agent.js`
+
+4. **docker-test-environment-generator**
+   - Generate test environment for worker validation
+   - CLI: `python scripts/generate_docker_env.py --config worker-test-config.yaml`
+
+---
+
+### Related Documentation
+
+**Plugin:** claude-quality-intelligence
+- **README:** [Plugin Overview](https://github.com/umitkacar/claude-plugins-marketplace/tree/master/claude-quality-intelligence)
+- **Agents:** [3 production-validated agents](https://github.com/umitkacar/claude-plugins-marketplace/tree/master/claude-quality-intelligence/agents)
+- **Skills:** [5 code generation skills](https://github.com/umitkacar/claude-plugins-marketplace/tree/master/claude-quality-intelligence/skills)
+- **Lessons:** [5 critical lessons from 100K GEM](https://github.com/umitkacar/claude-plugins-marketplace/blob/master/claude-quality-intelligence/docs/lessons/LESSONS_LEARNED.md)
+
+**Key Lessons for Workers:**
+- [Lesson #1: Single Queue Dual Purpose = Disaster](https://github.com/umitkacar/claude-plugins-marketplace/blob/master/claude-quality-intelligence/docs/lessons/LESSONS_LEARNED.md#lesson-1) - **NEVER consume from agent.results!**
+- [Lesson #3: Exclusive Queues for RPC](https://github.com/umitkacar/claude-plugins-marketplace/blob/master/claude-quality-intelligence/docs/lessons/LESSONS_LEARNED.md#lesson-3) - **CRITICAL** for brainstorm responses!
+- [Lesson #4: AgentId Synchronization](https://github.com/umitkacar/claude-plugins-marketplace/blob/master/claude-quality-intelligence/docs/lessons/LESSONS_LEARNED.md#lesson-4) - Accept agentId from Team Leader!
+- [Lesson #5: Dual-Publish Pattern](https://github.com/umitkacar/claude-plugins-marketplace/blob/master/claude-quality-intelligence/docs/lessons/LESSONS_LEARNED.md#lesson-5) - Status updates to Monitor
+
+---
+
+**Enhancement Status:** ✅ Worker Agent enhanced with claude-quality-intelligence patterns
+**Last Updated:** December 8, 2025
+**Plugin Version:** claude-quality-intelligence v1.0.0
